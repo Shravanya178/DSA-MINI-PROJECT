@@ -1,0 +1,269 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+
+typedef struct Node {
+    const char* word;
+    struct Node* next;
+} Node;
+
+// NEW NODE FUNCTION
+Node* createNode(const char* word) {
+    Node* newNode = (Node*)malloc(sizeof(Node));
+    newNode->word = word;
+    newNode->next = NULL;
+    return newNode;
+}
+
+// ADD NODE
+void appendNode(Node** head, const char* word) {
+    Node* newNode = createNode(word);
+    if (*head == NULL) {
+        *head = newNode;
+        return;
+    }
+    Node* temp = *head;
+    while (temp->next != NULL) {
+        temp = temp->next;
+    }
+    temp->next = newNode;
+}
+
+// LENGTH OF LINKED LIST
+int getListLength(Node* head) {
+    int length = 0;
+    Node* temp = head;
+    while (temp != NULL) {
+        length++;
+        temp = temp->next;
+    }
+    return length;
+}
+
+// SELECT RANDOM WORD FROM LIST
+const char* getRandomWord(Node* head) {
+    int length = getListLength(head);
+    srand(time(NULL));  // Initialize random seed
+    int randomIndex = rand() % length;
+
+    Node* temp = head;
+    for (int i = 0; i < randomIndex; i++) {
+        temp = temp->next;
+    }
+    return temp->word;
+}
+
+// FREE THE LINKED LIST
+void freeList(Node* head) {
+    Node* temp;
+    while (head != NULL) {
+        temp = head;
+        head = head->next;
+        free(temp);
+    }
+}
+
+// CATEGORIZE WORDS BY DIFFICULTY
+void categorizeWords(Node** easyList, Node** mediumList, Node** hardList, const char* words[], int numWords) {
+    for (int i = 0; i < numWords; i++) {
+        int len = strlen(words[i]);
+        if (len < 5) {
+            appendNode(easyList, words[i]);
+        } else if (len >= 5 && len <= 8) {
+            appendNode(mediumList, words[i]);
+        } else {
+            appendNode(hardList, words[i]);
+        }
+    }
+}
+
+// PROMPT USER TO SELECT DIFFICULTY LEVEL
+int selectDifficulty() {
+    int choice;
+    printf("\nSelect Difficulty Level:\n");
+    printf("1. Easy\n");
+    printf("2. Medium\n");
+    printf("3. Hard\n");
+    printf("Enter choice : ");
+    scanf("%d", &choice);
+    return choice;
+}
+
+// DISPLAY WORD WITH BLANK SPACES
+void displayCurrentWord(const char* word, const char* guessedWord) {
+    int length = strlen(word);
+    for (int i = 0; i < length; i++) {
+        printf("%c ", guessedWord[i]);
+    }
+    printf("\n");
+}
+
+// DISPLAY HANGMAN STAGES
+void displayHangman(int wrongGuesses) {
+    const char* hangmanStages[] = {
+        "  +---+\n      |\n      |\n      |\n     ===",
+        "  +---+\n  O   |\n      |\n      |\n     ===",
+        "  +---+\n  O   |\n  |   |\n      |\n     ===",
+        "  +---+\n  O   |\n /|   |\n      |\n     ===",
+        "  +---+\n  O   |\n /|\\  |\n      |\n     ===",
+        "  +---+\n  O   |\n /|\\  |\n /    |\n     ===",
+        "  +---+\n  O   |\n /|\\  |\n / \\  |\n     ==="
+    };
+    printf("%s\n", hangmanStages[wrongGuesses]);
+}
+
+// CHECK IF GUESSED LETTER IS IN WORD
+int checkGuess(const char* word, char* guessedWord, char guess) {
+    int correctGuess = 0;
+    int length = strlen(word);
+    for (int i = 0; i < length; i++) {
+        if (word[i] == guess) {
+            guessedWord[i] = guess;
+            correctGuess = 1;
+        }
+    }
+    return correctGuess;
+}
+
+// HINT FUNCTION: Reveal a random letter based on remaining hints
+void revealHint(const char* word, char* guessedWord, int* remainingHints) {
+    if (*remainingHints <= 0) {
+        printf("\nNo more hints available.\n");
+        return;
+    }
+
+    int length = strlen(word);
+    int revealed = 0;
+
+    while (revealed < 1) {
+        int randomIndex = rand() % length;
+
+        // If the letter at the random index hasn't been guessed yet
+        if (guessedWord[randomIndex] == '_') {
+            guessedWord[randomIndex] = word[randomIndex];
+            revealed++;
+        }
+    }
+
+    // Decrease remaining hints
+    (*remainingHints)--;
+    printf("\nHint revealed! Remaining hints: %d\n", *remainingHints);
+}
+
+void playGame(Node* easyList, Node* mediumList, Node* hardList) {
+    // Select difficulty level
+    int difficulty = selectDifficulty();
+    
+    // Get the appropriate word list based on the selected difficulty
+    Node* selectedList = NULL;
+    int remainingHints = 0;
+
+    if (difficulty == 1) {
+        selectedList = easyList;
+        remainingHints = 1;  // Easy: 1 hint
+    } else if (difficulty == 2) {
+        selectedList = mediumList;
+        remainingHints = 2;  // Medium: 2 hints
+    } else if (difficulty == 3) {
+        selectedList = hardList;
+        remainingHints = 3;  // Hard: 3 hints
+    } else {
+        printf("Invalid choice. Exiting...\n");
+        return;
+    }
+
+    // Show the number of hints at the start
+    printf("\nYou have %d hint(s) available for this game.\n", remainingHints);
+
+    // Get a random word from the selected difficulty list
+    const char* randomWord = getRandomWord(selectedList);
+    int wordLength = strlen(randomWord);
+    
+    char guessedWord[wordLength + 1];
+    for (int i = 0; i < wordLength; i++) {
+        guessedWord[i] = '_';
+    }
+    guessedWord[wordLength] = '\0';
+
+    printf("\nLet's play!\n");
+    displayCurrentWord(randomWord, guessedWord);
+
+    char guess;
+    int attempts = 0;
+    int maxAttempts = 6;
+
+    // Main game loop
+    while (attempts < maxAttempts && strcmp(randomWord, guessedWord) != 0) {
+        printf("\nGuess a letter (type '*' to request a hint): ");
+        scanf(" %c", &guess);
+
+        if (guess == '*') {
+            revealHint(randomWord, guessedWord, &remainingHints);
+        } else {
+            if (checkGuess(randomWord, guessedWord, guess)) {
+                printf("\nCorrect guess!\n");
+            } else {
+                printf("\nWrong guess. You have %d attempts remaining.\n", maxAttempts - ++attempts);
+                displayHangman(attempts);
+            }
+        }
+
+        displayCurrentWord(randomWord, guessedWord);
+    }
+
+    if (strcmp(randomWord, guessedWord) == 0) {
+        printf("\nCongratulations!🎉 You guessed the word: %s\n", randomWord);
+    } else {
+        printf("\nGame over!\nThe correct word was: %s\n", randomWord);
+    }
+}
+
+int main() {
+    Node* easyList = NULL;
+    Node* mediumList = NULL;
+    Node* hardList = NULL;
+    
+    const char* words[] = {
+        "inorder", "preorder", "binary", "search", "kruskall", "prims", "postfix", "prefix", "infix", "traversal", "malloc",
+        "enqueue", "dequeue", "string", "tuple", "link", "node", "structure", "hashing", "truncation", "quadratic",
+        "bubble", "insertion", "selection", "merge", "quick", "polish", "polynomial", "scheduling", "heap", "dijkstra",
+        "depth", "breadth", "greedy", "radix", "edge", "vertex", "root", "leaf", "parent", "child", "subtree", "height", "graph", "adjacency", "matrix","Algorithm", "Stack", "Queue", "List", "Set", "Tree", "Array", "Recursive", "Complexity", "Traversal", "Dynamic", "Graph", "Function", "Iteration"
+    };
+
+    int numWords = sizeof(words) / sizeof(words[0]);
+    
+    // Categorize words into difficulty levels
+    categorizeWords(&easyList, &mediumList, &hardList, words, numWords);
+
+    int choice;
+    int playing = 1;
+
+    while (playing) {
+        printf("\n ~~~ WELCOME TO LINKED LIST LIFELINE ☠\n");
+        printf("1. Start a New Game\n");
+        printf("2. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                playGame(easyList, mediumList, hardList);
+                break;
+            case 2:
+                printf("Thanks for Playing, Goodbye!👋\n");
+                playing = 0;
+                break;
+            default:
+                printf("Invalid choice. Please select 1 or 2.\n");
+                break;
+        }
+    }
+
+    
+    freeList(easyList);
+    freeList(mediumList);
+    freeList(hardList);
+
+    return 0;
+}
